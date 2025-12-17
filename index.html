@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapa de Alagamentos — Ribeirão Pires</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+html, body { height:100%; margin:0; }
+#map { height:100%; }
+
+.topbar {
+  position:absolute;
+  top:10px;
+  left:10px;
+  z-index:1000;
+  background:#fff;
+  padding:10px;
+  border-radius:6px;
+  box-shadow:0 2px 8px rgba(0,0,0,.2);
+  max-width:300px;
+}
+
+.topbar button {
+  width:100%;
+  margin-bottom:6px;
+}
+
+#formAdd { display:none; }
+textarea, input, select {
+  width:100%;
+  margin-bottom:6px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<div class="topbar">
+  <button onclick="toggleForm()">➕ Adicionar ponto</button>
+  <button onclick="carregarPontos()">🔄 Atualizar mapa</button>
+
+  <div id="formAdd">
+    <input id="bairro" placeholder="Bairro">
+    <select id="gravidade">
+      <option value="baixo">Baixo</option>
+      <option value="medio">Médio</option>
+      <option value="alto">Alto</option>
+    </select>
+    <textarea id="descricao" placeholder="Descrição do alagamento"></textarea>
+    <button onclick="salvarPonto()">💾 Salvar neste local</button>
+    <small>👉 Clique no mapa para escolher o local</small>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// 🔴 COLE A URL DO SEU APPS SCRIPT AQUI
+const APPS_SCRIPT_URL = "COLE_AQUI_SUA_URL_DO_SCRIPT";
+
+const map = L.map('map').setView([-23.740, -46.385], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+let pontoSelecionado = null;
+let camada = L.layerGroup().addTo(map);
+
+map.on('click', e => {
+  pontoSelecionado = e.latlng;
+  L.popup()
+    .setLatLng(e.latlng)
+    .setContent("📍 Local selecionado")
+    .openOn(map);
+});
+
+function toggleForm(){
+  const f = document.getElementById('formAdd');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function carregarPontos(){
+  camada.clearLayers();
+  const res = await fetch(APPS_SCRIPT_URL);
+  const geo = await res.json();
+
+  L.geoJSON(geo, {
+    onEachFeature:(f,l)=>{
+      l.bindPopup(
+        `<b>${f.properties.bairro}</b><br>
+         ${f.properties.descricao}<br>
+         Gravidade: ${f.properties.gravidade}`
+      );
+    }
+  }).addTo(camada);
+}
+
+async function salvarPonto(){
+  if(!pontoSelecionado){
+    alert("Clique no mapa primeiro!");
+    return;
+  }
+
+  const dados = {
+    lat: pontoSelecionado.lat,
+    lng: pontoSelecionado.lng,
+    bairro: bairro.value,
+    gravidade: gravidade.value,
+    descricao: descricao.value,
+    status: "aberto",
+    data_registro: new Date().toISOString()
+  };
+
+  await fetch(APPS_SCRIPT_URL,{
+    method:"POST",
+    body: JSON.stringify(dados)
+  });
+
+  alert("Ponto salvo!");
+  carregarPontos();
+}
+
+carregarPontos();
+</script>
+
+</body>
+</html>
